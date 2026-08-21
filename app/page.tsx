@@ -11,6 +11,7 @@ type Question = {
   prompt: string;
   options?: string[];
   answer: string;
+  accepted?: string[];
   explanation: string;
   keypoint: string;
 };
@@ -33,7 +34,7 @@ const questions: Question[] = [
   },
   {
     id: 849002, chapter: "8086 处理器", section: "存储器分段", type: "计算题", difficulty: "基础",
-    prompt: "8086 中 CS=2A10H、IP=0100H，求下一条指令所在单元的物理地址。", answer: "2A200H",
+    prompt: "8086 中 CS=2A10H、IP=0100H，求下一条指令所在单元的物理地址。", answer: "2A200H", accepted: ["2A200", "2A200H"],
     explanation: "物理地址=段基址×10H+偏移地址。2A10H×10H=2A100H，再加 0100H，得到 2A200H。",
     keypoint: "物理地址=段地址×16+偏移地址",
   },
@@ -51,13 +52,13 @@ const questions: Question[] = [
   },
   {
     id: 849005, chapter: "存储器系统", section: "容量扩展", type: "计算题", difficulty: "强化",
-    prompt: "用 8K×8 位存储器芯片组成 32K×16 位存储器，需要多少片芯片？", answer: "8片",
+    prompt: "用 8K×8 位存储器芯片组成 32K×16 位存储器，需要多少片芯片？", answer: "8片", accepted: ["8", "8片"],
     explanation: "字数扩展倍数为 32K/8K=4，位数扩展倍数为 16/8=2，共需 4×2=8 片。先位扩展、后字扩展更容易画出连接图。",
     keypoint: "芯片数=字扩展倍数×位扩展倍数",
   },
   {
     id: 849006, chapter: "输入输出与中断", section: "中断系统", type: "填空题", difficulty: "强化",
-    prompt: "8086 中断类型码为 N，则其中断向量在中断向量表中的首地址为 ______。", answer: "4N",
+    prompt: "8086 中断类型码为 N，则其中断向量在中断向量表中的首地址为 ______。", answer: "4N", accepted: ["4N", "N*4", "N×4"],
     explanation: "每个中断向量占 4 个字节，依次存放 IP 低/高字节和 CS 低/高字节，因此 N 号中断向量首地址为 4N。",
     keypoint: "中断向量表位于 00000H～003FFH",
   },
@@ -69,7 +70,7 @@ const questions: Question[] = [
   },
   {
     id: 849008, chapter: "可编程接口", section: "8253/8254", type: "计算题", difficulty: "强化",
-    prompt: "8253 的 CLK 输入频率为 1 MHz，若需产生 1 kHz 的周期信号，计数初值应为多少？", answer: "1000（03E8H）",
+    prompt: "8253 的 CLK 输入频率为 1 MHz，若需产生 1 kHz 的周期信号，计数初值应为多少？", answer: "1000（03E8H）", accepted: ["1000", "03E8H", "3E8H"],
     explanation: "分频计数初值 N=fCLK/fOUT=1,000,000/1,000=1000，换算为十六进制是 03E8H。",
     keypoint: "定时/计数器分频计算",
   },
@@ -123,15 +124,21 @@ export default function Home() {
 
   const filteredQuestions = useMemo(
     () => questions.filter((question) =>
+      (view !== "mistakes" || progress[question.id] === "mistake") &&
       (selectedChapter === "全部章节" || question.chapter === selectedChapter) &&
       (difficulty === "全部难度" || question.difficulty === difficulty)),
-    [selectedChapter, difficulty],
+    [selectedChapter, difficulty, view, progress],
   );
   const currentQuestion = filteredQuestions[questionIndex] ?? filteredQuestions[0];
   const mastered = Object.values(progress).filter((value) => value === "mastered").length;
   const mistakes = Object.values(progress).filter((value) => value === "mistake").length;
   const accuracy = Object.keys(progress).length ? Math.round((mastered / Object.keys(progress).length) * 100) : 68;
   const daysLeft = Math.max(0, Math.ceil((new Date("2026-12-19T08:30:00+08:00").getTime() - Date.now()) / 86400000));
+  const answerCorrect = currentQuestion
+    ? [currentQuestion.answer, ...(currentQuestion.accepted ?? [])].some(
+        (answer) => answer.replace(/\s/g, "").toUpperCase() === selectedAnswer.replace(/\s/g, "").toUpperCase(),
+      )
+    : false;
 
   function switchView(next: View) {
     setView(next);
@@ -207,7 +214,7 @@ export default function Home() {
               <div className="question-meta"><span>#{currentQuestion.id}</span><b>{currentQuestion.chapter}</b><b>{currentQuestion.section}</b><em data-difficulty={currentQuestion.difficulty}>{currentQuestion.difficulty}</em><small>{currentQuestion.type}</small></div>
               <h2>{currentQuestion.prompt}</h2>
               {currentQuestion.options ? <div className="options-list">{currentQuestion.options.map((option, index) => { const letter = String.fromCharCode(65 + index); const correct = revealed && letter === currentQuestion.answer; const wrong = revealed && selectedAnswer === letter && letter !== currentQuestion.answer; return <button key={letter} className={`${selectedAnswer === letter ? "selected" : ""} ${correct ? "correct" : ""} ${wrong ? "wrong" : ""}`} onClick={() => !revealed && setSelectedAnswer(letter)}><span>{letter}</span>{option}</button>; })}</div> : <label className="answer-input">你的答案<input value={selectedAnswer} onChange={(event) => setSelectedAnswer(event.target.value)} placeholder="先在草稿纸完成，再输入结果" disabled={revealed} /></label>}
-              {!revealed ? <button className="primary-button submit-answer" onClick={() => { setRevealed(true); markQuestion(selectedAnswer.trim().toUpperCase() === currentQuestion.answer.toUpperCase() ? "mastered" : "mistake"); }} disabled={!selectedAnswer.trim()}>提交并查看解析</button> : <div className="analysis-panel"><div className="answer-result"><span>参考答案</span><strong>{currentQuestion.answer}</strong><em>{selectedAnswer.trim().toUpperCase() === currentQuestion.answer.toUpperCase() ? "回答正确" : "需要复测"}</em></div><div><span>解题解析</span><p>{currentQuestion.explanation}</p><small><b>核心考点：</b>{currentQuestion.keypoint}</small></div></div>}
+              {!revealed ? <button className="primary-button submit-answer" onClick={() => { setRevealed(true); markQuestion(answerCorrect ? "mastered" : "mistake"); }} disabled={!selectedAnswer.trim()}>提交并查看解析</button> : <div className="analysis-panel"><div className="answer-result"><span>参考答案</span><strong>{currentQuestion.answer}</strong><em>{answerCorrect ? "回答正确" : "需要复测"}</em></div><div><span>解题解析</span><p>{currentQuestion.explanation}</p><small><b>核心考点：</b>{currentQuestion.keypoint}</small></div></div>}
               <div className="question-footer"><div><span>掌握状态</span><button onClick={() => markQuestion("mastered")}>✓ 已掌握</button><button onClick={() => markQuestion("unsure")}>? 有点模糊</button><button onClick={() => markQuestion("mistake")}>↻ 加入错题</button></div><button className="next-button" onClick={nextQuestion}>下一题 →</button></div>
             </article> : <div className="empty-state"><strong>当前筛选下没有题目</strong><p>换一个章节或难度继续练习。</p></div>}
           </section>}
