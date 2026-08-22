@@ -1,107 +1,96 @@
-# vinext-starter
+# 849 微机研习社
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+> [!CAUTION]
+> **版权声明 / COPYRIGHT NOTICE**<br>
+> **本仓库的软件代码与题库内容采用不同的授权方式。MIT License 仅适用于软件源代码，不适用于题目、选项、答案、解析、课程资料及其衍生内容。公开仓库不代表上述内容进入公有领域，也不代表任何人获得复制、传播、转售或商业使用权。**<br>
+> **The software source code and the educational content in this repository are licensed separately. The MIT License applies only to the software source code. It does not apply to questions, choices, answers, explanations, course materials, or derivative educational content. Public availability does not place that content in the public domain or grant permission to copy, redistribute, resell, or commercially exploit it.**
 
-## Prerequisites
+849 微机研习社是一个面向计算机专业课学习与复习的在线题库系统，提供分类练习、学习计划、组卷考试、错题记录和间隔复测等功能。
 
-- Node.js `>=22.13.0`
-- Linux with `flock`, `curl`, and GNU `timeout`
+- 在线访问：[849 微机研习社](https://chase849.hebuyijiangnan.chatgpt.site)
+- 技术栈：Next.js、React、TypeScript、Cloudflare D1、Drizzle ORM、Vinext
 
-## Sites Lifecycle
+## 主要功能
 
-The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
+- 按知识类别浏览和练习题目
+- 账户信息与学习进度同步
+- 自定义学习计划
+- 随机组卷与模拟考试
+- 错题收集和间隔复测
+- 可展开或收起的侧边导航
+- 字体大小调节和阅读体验优化
+- 账户设置与学习 ID 修改
 
-This starter does not use `wrangler.jsonc`.
+## 本地运行
 
-`install:ci` is intentionally a single, non-retrying `npm ci`. It refuses a concurrent install for the same project, consumes a matching image-seeded npm cache with `--prefer-offline` while retaining registry fallback for a missing cache object, otherwise downloads and verifies the complete vinext tarball recorded in `package-lock.json`, limits npm to one socket, and terminates a stalled install. `build` applies a short timeout. These helpers target Linux and use GNU `timeout`; they are not native macOS scripts.
+### 环境要求
 
-Scripts that need writable project-scoped home, npm, XDG, and temporary paths use `scripts/sites-env.sh`. The `dev` and `start` scripts honor the caller's runtime environment and keep Wrangler logs inside the checkout. The generated `.sites-runtime/` directory is disposable and ignored by Git.
+- Node.js `>= 22.13.0`
+- npm
 
-## Included Shape
+### 启动步骤
 
-- edit site code under `app/`
-- `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+npm ci
+npm run dev
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+按照终端提示在浏览器中打开本地地址即可。
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+常用命令：
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+```bash
+npm run dev          # 启动开发环境
+npm run build        # 构建部署版本
+npm test             # 构建并运行测试
+npm run lint         # 代码检查
+npm run db:generate  # 生成数据库迁移
+```
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+## 项目结构
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+```text
+app/                 页面、样式与 API 路由
+db/                  数据库连接和表结构
+drizzle/             数据库迁移文件
+public/              公共静态资源
+scripts/             构建及环境脚本
+tests/               自动化测试
+worker/              Cloudflare Worker 入口
+.openai/hosting.json Sites 托管配置
+```
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+## 数据与隐私
 
-## Diagnostic Commands
+- GitHub 仓库只保存程序源代码和随代码发布的静态内容，不包含线上用户账户、学习进度或错题记录。
+- 线上数据存储在部署环境所绑定的数据库中，不会因为公开本仓库而自动公开。
+- 请勿提交 `.env`、访问令牌、数据库密钥或其他私密配置。项目的 `.gitignore` 已默认排除常见敏感文件和构建产物。
+- `.openai/hosting.json` 中的项目编号不是访问凭据；其他人无法仅凭该编号管理线上站点或读取数据库。
 
-- `npm run install:ci`: perform the one bounded lockfile install
-- `npm run dev`: start the Vite/Vinext development server
-- `npm run build`: build the deployable Sites artifact
-- `npm run start`: start the built Vinext application
-- `npm test`: build and verify the rendered development-preview metadata
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+## 授权与版权
 
-Use build commands for targeted diagnosis after a remote failure, not as part of the normal checkpoint path.
+### 软件代码
 
-The timeout defaults can be overridden for a controlled canary with `SITES_INSTALL_TIMEOUT`, `SITES_INSTALL_KILL_AFTER`, `SITES_BUILD_TIMEOUT`, and `SITES_BUILD_KILL_AFTER`. A timeout fails the command; the helpers never retry an unchanged install or build.
+除第三方依赖和另有说明的文件外，本仓库的软件源代码依据 [MIT License](./LICENSE) 开放使用。
 
-## Learn More
+### 题库及课程相关内容
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+题目、选项、答案、解析、课程资料以及基于课程资料整理或改写的内容，**不属于 MIT License 的授权范围**。相关内容的权利由各自权利人保留。除非取得权利人书面授权或法律另有允许，不得将这些内容复制、批量抓取、重新发布、转售、用于商业产品或作为模型训练数据。
+
+本项目的公开与教育用途不构成对任何第三方商标、教材、课程或题库权利的主张。如权利人认为仓库中的内容侵犯其合法权益，请通过 [GitHub Issue](../../issues) 提交权属说明和具体文件位置，我们将及时核验并处理。
+
+完整的中英文版权说明请阅读 [COPYRIGHT.md](./COPYRIGHT.md)。
+
+### Software Code
+
+Except for third-party dependencies and files explicitly marked otherwise, the software source code is available under the [MIT License](./LICENSE).
+
+### Question Bank and Course-Related Content
+
+Questions, choices, answers, explanations, course materials, and content organized or rewritten from course materials are **not licensed under the MIT License**. All such rights remain with their respective owners. Unless authorized in writing by the relevant rights holder or otherwise permitted by law, this content may not be copied, scraped in bulk, republished, resold, incorporated into commercial products, or used as model-training data.
+
+The educational and public nature of this project does not assert ownership of any third-party trademark, textbook, course, or question-bank material. Rights holders may submit ownership information and precise file locations through a [GitHub Issue](../../issues) for review and appropriate action.
+
+## 参与贡献
+
+欢迎提交 Issue 或 Pull Request 改进程序功能。贡献代码即表示你有权提交该代码，并同意其按照本仓库的软件代码许可证发布。请勿提交来源不明、未经授权或含有个人信息的题库和课程资料。
