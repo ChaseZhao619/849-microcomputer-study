@@ -5,11 +5,16 @@ export const userProfiles = sqliteTable("user_profiles", {
   userId: text("user_id").primaryKey(),
   email: text("email").notNull(),
   displayName: text("display_name").notNull(),
+  nickname: text("nickname"),
+  studyId: text("study_id"),
+  bio: text("bio").notNull().default(""),
   examDate: text("exam_date").notNull().default("2026-12-19"),
   dailyGoal: integer("daily_goal").notNull().default(20),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  uniqueIndex("idx_user_profiles_study_id").on(table.studyId),
+]);
 
 export const questionProgress = sqliteTable("question_progress", {
   userId: text("user_id").notNull(),

@@ -15,6 +15,13 @@
       "when": 1787331762295,
       "tag": "0001_bright_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787363659531,
+      "tag": "0002_chunky_viper",
+      "breakpoints": true
     }
   ]
 }
