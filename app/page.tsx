@@ -59,6 +59,8 @@ const fontSizes: Array<{ id: FontSize; label: string }> = [
   { id: "xlarge", label: "特大" },
 ];
 
+const heatLevelLabels = ["无作答", "1–4 次", "5–9 次", "10–19 次", "20 次以上"] as const;
+
 function shanghaiDate(value = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(value);
 }
@@ -306,7 +308,12 @@ export default function Home() {
       date.setDate(start.getDate() + index);
       const key = shanghaiDate(date);
       const count = activity[key] ?? 0;
-      return { key, count, level: count === 0 ? 0 : count < 5 ? 1 : count < 10 ? 2 : count < 20 ? 3 : 4 };
+      return {
+        key,
+        count,
+        level: count === 0 ? 0 : count < 5 ? 1 : count < 10 ? 2 : count < 20 ? 3 : 4,
+        label: new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", month: "long", day: "numeric", weekday: "short" }).format(new Date(`${key}T12:00:00+08:00`)),
+      };
     });
   }, [activity]);
 
@@ -630,7 +637,7 @@ export default function Home() {
               <section className="stats-grid" aria-label="学习概览"><article><span className="stat-icon cyan">∿</span><div><small>累计已练</small><strong>{Object.keys(progress).length}<em>题</em></strong><p>题库共200题</p></div></article><article><span className="stat-icon amber">◎</span><div><small>当前正确率</small><strong>{accuracy}<em>%</em></strong><p>按真实作答计算</p></div></article><article><span className="stat-icon violet">◇</span><div><small>已掌握</small><strong>{mastered}<em>/200</em></strong><p>覆盖52个专题</p></div></article><article><span className="stat-icon red">↻</span><div><small>今日到期复测</small><strong>{dueReviews}<em>题</em></strong><button onClick={() => switchView("mistakes")}>开始复测 →</button></div></article></section>
               <section className="dashboard-grid">
                 <article className="study-card"><div className="section-heading"><div><span>今日任务</span><h2>继续学习计划</h2></div><button onClick={() => switchView("plan")}>管理计划</button></div><div className="task-list">{planItems.slice(0,3).map((item,index) => <button key={String(item.id ?? item.localKey)} onClick={() => beginPlan(item)}><span className="task-number">{String(index+1).padStart(2,"0")}</span><div><b>{item.chapter}</b><small>{item.completedQuestions}/{item.targetQuestions}题 · 自动回填</small></div><em><i style={{ width: String(Math.round(item.completedQuestions/item.targetQuestions*100))+"%" }} />{item.status === "completed" ? "已完成" : "进行中"}</em><strong>继续 →</strong></button>)}{!planItems.length && <div className="empty-inline">还没有计划，前往“学习计划”生成今日任务。</div>}</div></article>
-                <article className="activity-card"><div className="section-heading"><div><span>真实历史</span><h2>近10个完整周</h2></div><b>今日 {activity[shanghaiDate()] ?? 0} 次</b></div><div className="heat-wrap"><div className="heat-labels"><span>一</span><span>三</span><span>五</span><span>日</span></div><div className="heatmap" aria-label="近十周真实学习热力图">{heatDays.map((day) => <i key={day.key} data-level={day.level} title={day.key+"，有效作答"+day.count+"次"} />)}</div></div><div className="heat-footer"><span>按上海时区记录每次有效作答</span><span>少 <i data-level="1" /><i data-level="2" /><i data-level="3" /><i data-level="4" /> 多</span></div></article>
+                <article className="activity-card"><div className="section-heading"><div><span>真实历史</span><h2>近10个完整周</h2></div><b>今日 {activity[shanghaiDate()] ?? 0} 次</b></div><div className="heat-wrap"><div className="heat-labels"><span>一</span><span>三</span><span>五</span><span>日</span></div><div className="heatmap" role="list" aria-label="近十周真实学习热力图">{heatDays.map((day) => <span key={day.key} className="heat-cell" role="listitem" tabIndex={day.count > 0 ? 0 : -1} data-level={day.level} aria-label={`${day.label}，${day.count} 次有效作答，强度 ${heatLevelLabels[day.level]}`}><span className="heat-tooltip" aria-hidden="true"><strong>{day.label}</strong><b>{day.count} 次有效作答</b><small>强度 · {heatLevelLabels[day.level]}</small></span></span>)}</div></div><div className="heat-footer"><span>按上海时区记录每次有效作答</span><span className="heat-legend" aria-label="作答次数强度图例"><span><i data-level="0" />0</span><span><i data-level="1" />1–4</span><span><i data-level="2" />5–9</span><span><i data-level="3" />10–19</span><span><i data-level="4" />20+</span></span></div></article>
               </section>
             </>}
 
