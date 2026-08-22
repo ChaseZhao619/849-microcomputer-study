@@ -290,8 +290,6 @@ const questions: Question[] = chapterGroups.flatMap((chapter) => [
   ...starterQuestions.filter((question) => question.chapter === chapter.name),
   ...generatedQuestions.filter((question) => question.chapter === chapter.name),
 ]);
-const PAGE_LOADED_AT = Date.now();
-
 const plannedQuestionCount = chapterGroups.reduce((total, chapter) => total + chapter.target, 0);
 const topicCount = chapterGroups.reduce((total, chapter) => total + chapter.sections.length, 0);
 
@@ -323,6 +321,7 @@ export default function Home() {
   const [view, setView] = useState<View>("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
   const [dark, setDark] = useState(false);
   const [fontSize, setFontSize] = useState<FontSize>("standard");
   const [selectedChapter, setSelectedChapter] = useState("全部章节");
@@ -362,6 +361,7 @@ export default function Home() {
     const savedFontSize = localStorage.getItem("micro849-font-size") as FontSize | null;
     const savedSidebar = localStorage.getItem("micro849-sidebar");
     queueMicrotask(() => {
+      setCurrentTime(Date.now());
       try { if (saved) setProgress(JSON.parse(saved)); } catch { localStorage.removeItem("micro849-progress"); }
       try { if (savedReviews) setReviews(JSON.parse(savedReviews)); } catch { localStorage.removeItem("micro849-reviews"); }
       try { if (savedPlans) setPlanItems(JSON.parse(savedPlans)); } catch { localStorage.removeItem("micro849-plans"); }
@@ -441,17 +441,17 @@ export default function Home() {
 
   const filteredQuestions = useMemo(
     () => questions.filter((question) =>
-      (view !== "mistakes" || (progress[question.id] === "mistake" && (!reviews[question.id]?.nextReviewAt || new Date(reviews[question.id].nextReviewAt!).getTime() <= PAGE_LOADED_AT))) &&
+      (view !== "mistakes" || (progress[question.id] === "mistake" && (!reviews[question.id]?.nextReviewAt || new Date(reviews[question.id].nextReviewAt!).getTime() <= currentTime))) &&
       (selectedChapter === "全部章节" || question.chapter === selectedChapter) &&
       (difficulty === "全部难度" || question.difficulty === difficulty)),
-    [selectedChapter, difficulty, view, progress, reviews],
+    [selectedChapter, difficulty, view, progress, reviews, currentTime],
   );
   const currentQuestion = filteredQuestions[questionIndex] ?? filteredQuestions[0];
   const mastered = Object.values(progress).filter((value) => value === "mastered").length;
   const mistakes = Object.values(progress).filter((value) => value === "mistake").length;
-  const dueReviews = questions.filter((question) => progress[question.id] === "mistake" && (!reviews[question.id]?.nextReviewAt || new Date(reviews[question.id].nextReviewAt!).getTime() <= PAGE_LOADED_AT)).length;
+  const dueReviews = questions.filter((question) => progress[question.id] === "mistake" && (!reviews[question.id]?.nextReviewAt || new Date(reviews[question.id].nextReviewAt!).getTime() <= currentTime)).length;
   const accuracy = Object.keys(progress).length ? Math.round((mastered / Object.keys(progress).length) * 100) : 0;
-  const daysLeft = Math.max(0, Math.ceil((new Date(`${examDate}T08:30:00+08:00`).getTime() - PAGE_LOADED_AT) / 86400000));
+  const daysLeft = currentTime ? Math.max(0, Math.ceil((new Date(`${examDate}T08:30:00+08:00`).getTime() - currentTime) / 86400000)) : null;
   const answerCorrect = currentQuestion
     ? [currentQuestion.answer, ...(currentQuestion.accepted ?? [])].some(
         (answer) => answer.replace(/\s/g, "").toUpperCase() === selectedAnswer.replace(/\s/g, "").toUpperCase(),
@@ -584,7 +584,7 @@ export default function Home() {
           {view === "home" && <>
             <section className="hero-panel">
               <div className="hero-copy"><span className="eyebrow"><i /> 2027 考研 · 上海理工大学</span><h1>把 849 的每一个<br /><em>失分点</em>，练成得分点。</h1><p>依据考试大纲、章节讲义与有效周练拆解知识点；第三方资料只用于考点提炼，公开题目均重新命制。</p><div className="hero-actions"><button className="primary-button" onClick={() => beginChapter("8086 CPU结构")}>开始章节训练 <span>→</span></button><button className="secondary-button" onClick={() => switchView("exam")}>快速组卷</button></div><div className="hero-meta"><span>✓ 11 章 52 专题</span><span>✓ {questions.length} 道原创改写题</span><span>✓ {account ? "账户跨设备同步" : "登录后跨设备同步"}</span></div></div>
-              <div className="countdown-card"><div className="circuit-corner" /><span>距离预计初试</span><strong>{daysLeft}</strong><b>DAYS</b><p>目标：完成 3 轮知识闭环</p><div className="countdown-track"><i /></div><small>当前阶段 · 基础强化</small></div>
+              <div className="countdown-card"><div className="circuit-corner" /><span>距离预计初试</span><strong>{daysLeft ?? "—"}</strong><b>DAYS</b><p>目标：完成 3 轮知识闭环</p><div className="countdown-track"><i /></div><small>当前阶段 · 基础强化</small></div>
             </section>
             <section className="stats-grid" aria-label="学习概览">
               <article><span className="stat-icon cyan">∿</span><div><small>{account ? "账户已练" : "本机已练"}</small><strong>{Object.keys(progress).length}<em>题</em></strong><p>题库已上线 {questions.length} 题</p></div></article>
