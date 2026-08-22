@@ -305,16 +305,25 @@ const navItems = [
 ] as const;
 
 type View = (typeof navItems)[number]["id"];
+type FontSize = "small" | "standard" | "large" | "xlarge";
 type StoredProgress = Record<number, "mastered" | "unsure" | "mistake">;
 type ReviewRecord = { stage: number; nextReviewAt: string | null; attempts: number; correctAttempts: number };
 type StoredReviews = Record<number, ReviewRecord>;
 type AccountSummary = { displayName: string; email: string };
 type PlanItem = { planDate: string; chapter: string; targetQuestions: number; completedQuestions: number; status: string };
 
+const fontSizes: Array<{ id: FontSize; label: string }> = [
+  { id: "small", label: "小" },
+  { id: "standard", label: "标准" },
+  { id: "large", label: "大" },
+  { id: "xlarge", label: "特大" },
+];
+
 export default function Home() {
   const [view, setView] = useState<View>("home");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dark, setDark] = useState(false);
+  const [fontSize, setFontSize] = useState<FontSize>("standard");
   const [selectedChapter, setSelectedChapter] = useState("全部章节");
   const [difficulty, setDifficulty] = useState("全部难度");
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -343,11 +352,13 @@ export default function Home() {
     const savedReviews = localStorage.getItem("micro849-reviews");
     const savedPlans = localStorage.getItem("micro849-plans");
     const savedTheme = localStorage.getItem("micro849-theme");
+    const savedFontSize = localStorage.getItem("micro849-font-size") as FontSize | null;
     queueMicrotask(() => {
       try { if (saved) setProgress(JSON.parse(saved)); } catch { localStorage.removeItem("micro849-progress"); }
       try { if (savedReviews) setReviews(JSON.parse(savedReviews)); } catch { localStorage.removeItem("micro849-reviews"); }
       try { if (savedPlans) setPlanItems(JSON.parse(savedPlans)); } catch { localStorage.removeItem("micro849-plans"); }
       if (savedTheme === "dark") setDark(true);
+      if (savedFontSize && fontSizes.some((size) => size.id === savedFontSize)) setFontSize(savedFontSize);
     });
 
     fetch("/api/account", { cache: "no-store" }).then(async (response) => {
@@ -376,6 +387,17 @@ export default function Home() {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     localStorage.setItem("micro849-theme", dark ? "dark" : "light");
   }, [dark]);
+
+  useEffect(() => {
+    document.documentElement.dataset.fontSize = fontSize;
+    localStorage.setItem("micro849-font-size", fontSize);
+  }, [fontSize]);
+
+  function adjustFontSize(direction: -1 | 1) {
+    const current = fontSizes.findIndex((size) => size.id === fontSize);
+    const next = Math.min(fontSizes.length - 1, Math.max(0, current + direction));
+    setFontSize(fontSizes[next].id);
+  }
 
   const filteredQuestions = useMemo(
     () => questions.filter((question) =>
@@ -515,7 +537,7 @@ export default function Home() {
         <header className="topbar">
           <button className="mobile-menu" onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="打开学习导航">☰</button>
           <div className="breadcrumb"><span>849 微机原理及应用</span><b>/</b><strong>{navItems.find((item) => item.id === view)?.label}</strong></div>
-          <div className="top-actions"><button className="search-button" onClick={() => { setView("practice"); setNotice("已进入题库，可按章节筛选"); }}>⌕ <span>搜索题目</span><kbd>⌘ K</kbd></button><button className="icon-button" onClick={() => setDark(!dark)} aria-label="切换深色模式">{dark ? "☀" : "☾"}</button>{account ? <a className="account-chip" href="/signout-with-chatgpt?return_to=%2F" title={`${account.email} · 点击退出`}><span>{account.displayName.slice(0, 1).toUpperCase()}</span><small>{syncState === "synced" ? "已同步" : "同步中"}</small></a> : <a className="signin-button" href="/signin-with-chatgpt?return_to=%2F">登录同步</a>}</div>
+          <div className="top-actions"><button className="search-button" onClick={() => { setView("practice"); setNotice("已进入题库，可按章节筛选"); }}>⌕ <span>搜索题目</span><kbd>⌘ K</kbd></button><div className="font-controls" role="group" aria-label="调节网站字体大小"><button onClick={() => adjustFontSize(-1)} disabled={fontSize === "small"} aria-label="缩小字体">A−</button><span>字号 {fontSizes.find((size) => size.id === fontSize)?.label}</span><button onClick={() => adjustFontSize(1)} disabled={fontSize === "xlarge"} aria-label="放大字体">A＋</button></div><button className="icon-button" onClick={() => setDark(!dark)} aria-label="切换深色模式">{dark ? "☀" : "☾"}</button>{account ? <a className="account-chip" href="/signout-with-chatgpt?return_to=%2F" title={`${account.email} · 点击退出`}><span>{account.displayName.slice(0, 1).toUpperCase()}</span><small>{syncState === "synced" ? "已同步" : "同步中"}</small></a> : <a className="signin-button" href="/signin-with-chatgpt?return_to=%2F">登录同步</a>}</div>
         </header>
 
         <main>
