@@ -316,6 +316,12 @@ export default function Home() {
     if (next === "mistakes") { setSelectedChapter("全部章节"); setDifficulty("全部难度"); setSearchFilter(""); }
   }
 
+  function returnHome() {
+    switchView("home");
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+  }
+
   function resetQuestionState(id: number | null = null) {
     setActiveQuestionId(id);
     setSelectedAnswer("");
@@ -599,7 +605,7 @@ export default function Home() {
     <div className="app-shell">
       <div className={sidebarCollapsed ? "sidebar-collapsed" : ""} inert={modalOpen ? true : undefined} aria-hidden={modalOpen ? "true" : undefined}>
         <aside className={"sidebar " + (sidebarOpen ? "sidebar-open" : "")} aria-label="学习导航">
-          <div className="brand"><div className="brand-mark" aria-hidden="true"><span>8</span><span>49</span></div><div className="brand-copy"><strong>微机研习社</strong><small>849 STUDY LAB</small></div><button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label={sidebarCollapsed ? "展开左侧导航栏" : "收起左侧导航栏"}>{sidebarCollapsed ? "›" : "‹"}</button></div>
+          <div className="brand"><button className="brand-home" onClick={returnHome} aria-label="返回学习首页"><div className="brand-mark" aria-hidden="true"><span>8</span><span>49</span></div><div className="brand-copy"><strong>微机研习社</strong><small>849 STUDY LAB</small></div></button><button className="sidebar-toggle" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label={sidebarCollapsed ? "展开左侧导航栏" : "收起左侧导航栏"}>{sidebarCollapsed ? "›" : "‹"}</button></div>
           <nav className="main-nav" aria-label="主要功能"><p className="nav-title">学习工作台</p>{navItems.map((item) => <button key={item.id} className={view === item.id ? "nav-active" : ""} onClick={() => switchView(item.id)}><span aria-hidden="true">{item.icon}</span>{item.label}{item.id === "mistakes" && <em>{dueReviews}</em>}</button>)}</nav>
           <div className="chapter-nav"><p className="nav-title">知识树 · 11章</p>{chapterGroups.map((chapter) => <button key={chapter.name} onClick={() => beginChapter(chapter.name)}><span>{chapter.code}</span><div><strong>{chapter.name}</strong><small>{chapter.sections.length} 专题 · {chapter.target}题</small></div></button>)}</div>
           <div className="book-card"><span>题库版本</span><strong>200题 · 逐题编辑复核</strong><small>110选择 / 35计算 / 55主观</small></div>
