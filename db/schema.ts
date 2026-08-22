@@ -55,3 +55,46 @@ export const examAttempts = sqliteTable("exam_attempts", {
 }, (table) => [
   index("idx_exam_attempts_user_completed").on(table.userId, table.completedAt),
 ]);
+
+export const answerEvents = sqliteTable("answer_events", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  questionId: integer("question_id").notNull(),
+  source: text("source").notNull(),
+  correct: integer("correct", { mode: "boolean" }).notNull(),
+  answeredAt: text("answered_at").notNull(),
+  activityDate: text("activity_date").notNull(),
+}, (table) => [
+  index("idx_answer_events_user_date").on(table.userId, table.activityDate),
+]);
+
+export const studyPlanCompletions = sqliteTable("study_plan_completions", {
+  planId: integer("plan_id").notNull(),
+  userId: text("user_id").notNull(),
+  questionId: integer("question_id").notNull(),
+  completedAt: text("completed_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  primaryKey({ columns: [table.planId, table.questionId] }),
+  index("idx_plan_completions_user_plan").on(table.userId, table.planId),
+]);
+
+export const examSessions = sqliteTable("exam_sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  scope: text("scope").notNull(),
+  questionIdsJson: text("question_ids_json").notNull(),
+  answersJson: text("answers_json").notNull().default("{}"),
+  selfScoresJson: text("self_scores_json").notNull().default("{}"),
+  currentIndex: integer("current_index").notNull().default(0),
+  durationSeconds: integer("duration_seconds").notNull(),
+  remainingSeconds: integer("remaining_seconds").notNull(),
+  deadlineAt: text("deadline_at"),
+  status: text("status").notNull().default("active"),
+  score: integer("score").notNull().default(0),
+  total: integer("total").notNull().default(0),
+  startedAt: text("started_at").notNull(),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  completedAt: text("completed_at"),
+}, (table) => [
+  index("idx_exam_sessions_user_status_updated").on(table.userId, table.status, table.updatedAt),
+]);
