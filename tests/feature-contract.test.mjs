@@ -34,6 +34,10 @@ const paper = await readFile(
   new URL("../app/components/ExamActiveWorkspace.tsx", import.meta.url),
   "utf8",
 );
+const subjectiveTools = await readFile(
+  new URL("../app/components/SubjectiveAnswerTools.tsx", import.meta.url),
+  "utf8",
+);
 
 test("搜索与对话框键盘契约存在", () => {
   for (const token of [
@@ -85,6 +89,21 @@ test("整卷、私有附件和BYOK安全契约存在", () => {
     "possible_points",
   ])
     assert.ok(upgradeMigration.includes(table), table);
+});
+
+test("AI配置集中到个人设置并由所有题目共享", () => {
+  for (const token of [
+    "AI辅助设置",
+    "savePersonalAiSettings",
+    "unlockPersonalAiSettings",
+    "所有题目共用同一配置",
+    "aiConfig={aiConfig}",
+  ])
+    assert.ok(page.includes(token), token);
+  for (const token of ["前往个人设置", "onOpenAiSettings", "aiConfig"])
+    assert.ok(subjectiveTools.includes(token), token);
+  for (const token of ["saveAiVault", "unlockAiVault", "API Token"])
+    assert.ok(!subjectiveTools.includes(token), token);
 });
 
 test("进度、活动和考试接口具备幂等与生命周期动作", () => {

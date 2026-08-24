@@ -23,6 +23,13 @@ import { SubjectiveAnswerTools } from "./components/SubjectiveAnswerTools";
 import { type AnalyticsEvent, type ExamLike } from "./analytics";
 import { deleteExamLocalDrafts } from "./ink-storage";
 import {
+  clearAiVault,
+  readAiVaultHint,
+  saveAiVault,
+  unlockAiVault,
+  type AiVaultConfig,
+} from "./ai-vault";
+import {
   buildPaperLayout,
   emptyExamAnswer,
   examAnswerText,
@@ -136,6 +143,14 @@ const chapterGroups = [
     target: 18,
   },
 ];
+
+function defaultAiModel(provider: AiVaultConfig["provider"]) {
+  return provider === "qwen"
+    ? "qwen3-vl-plus"
+    : provider === "openai"
+      ? "gpt-5.4"
+      : "deepseek-v4-flash";
+}
 
 const navItems = [
   { id: "home", label: "学习首页", icon: "⌂" },
@@ -315,6 +330,18 @@ export default function Home() {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const settingsErrorRef = useRef<HTMLParagraphElement>(null);
+  const [aiVaultHint, setAiVaultHint] = useState<{
+    provider: AiVaultConfig["provider"];
+    model: string;
+  } | null>(null);
+  const [aiProvider, setAiProvider] =
+    useState<AiVaultConfig["provider"]>("qwen");
+  const [aiModel, setAiModel] = useState(defaultAiModel("qwen"));
+  const [aiApiKey, setAiApiKey] = useState("");
+  const [aiPassphrase, setAiPassphrase] = useState("");
+  const [aiConfig, setAiConfig] = useState<AiVaultConfig | null>(null);
+  const [aiSettingsBusy, setAiSettingsBusy] = useState(false);
+  const [aiSettingsMessage, setAiSettingsMessage] = useState("");
   const [syncState, setSyncState] = useState<
     "loading" | "synced" | "local" | "error"
   >("loading");
@@ -339,6 +366,18 @@ export default function Home() {
   const searchDialogRef = useFocusTrap(searchOpen, closeSearch, searchInputRef);
   const settingsDialogRef = useFocusTrap(settingsOpen, closeSettings);
   const modalOpen = searchOpen || settingsOpen;
+
+  useEffect(() => {
+    readAiVaultHint()
+      .then((hint) => {
+        setAiVaultHint(hint);
+        if (hint) {
+          setAiProvider(hint.provider);
+          setAiModel(hint.model);
+        }
+      })
+      .catch(() => setAiSettingsMessage("无法读取这台设备上的AI配置"));
+  }, []);
 
   useEffect(() => {
     const savedProgress = localStorage.getItem("micro849-progress");
@@ -1274,6 +1313,74 @@ export default function Home() {
       ":" +
       String(safe % 60).padStart(2, "0")
     );
+  }
+
+  async function savePersonalAiSettings() {
+    const key = aiApiKey.trim() || aiConfig?.apiKey || "";
+    if (!key) {
+      setAiSettingsMessage("请输入API Token；已有配置请先解锁再修改");
+      return;
+    }
+    if (aiPassphrase.length < 8) {
+      setAiSettingsMessage("本机加密口令至少需要8个字符");
+      return;
+    }
+    setAiSettingsBusy(true);
+    setAiSettingsMessage("");
+    try {
+      const config = {
+        provider: aiProvider,
+        model: aiModel.trim() || defaultAiModel(aiProvider),
+        apiKey: key,
+      } satisfies AiVaultConfig;
+      await saveAiVault(config, aiPassphrase);
+      setAiConfig(config);
+      setAiVaultHint({ provider: config.provider, model: config.model });
+      setAiApiKey("");
+      setAiPassphrase("");
+      setAiSettingsMessage("已加密长期保存在这台设备，本次会话也已解锁");
+    } catch (error) {
+      setAiSettingsMessage(
+        error instanceof Error ? error.message : "AI配置保存失败",
+      );
+    } finally {
+      setAiSettingsBusy(false);
+    }
+  }
+
+  async function unlockPersonalAiSettings() {
+    setAiSettingsBusy(true);
+    setAiSettingsMessage("");
+    try {
+      const config = await unlockAiVault(aiPassphrase);
+      setAiConfig(config);
+      setAiProvider(config.provider);
+      setAiModel(config.model);
+      setAiPassphrase("");
+      setAiSettingsMessage("AI辅助已解锁，本次浏览器会话内所有题目均可直接使用");
+    } catch (error) {
+      setAiSettingsMessage(
+        error instanceof Error ? error.message : "AI配置解锁失败",
+      );
+    } finally {
+      setAiSettingsBusy(false);
+    }
+  }
+
+  async function clearPersonalAiSettings() {
+    setAiSettingsBusy(true);
+    try {
+      await clearAiVault();
+      setAiVaultHint(null);
+      setAiConfig(null);
+      setAiProvider("qwen");
+      setAiModel(defaultAiModel("qwen"));
+      setAiApiKey("");
+      setAiPassphrase("");
+      setAiSettingsMessage("这台设备上的AI配置已清除");
+    } finally {
+      setAiSettingsBusy(false);
+    }
   }
 
   async function saveAccountSettings() {
@@ -2332,6 +2439,8 @@ export default function Home() {
                     exam={exam}
                     bank={questions}
                     account={Boolean(account)}
+                    aiConfig={aiConfig}
+                    onOpenAiSettings={() => setSettingsOpen(true)}
                     formatClock={formatClock}
                     onChange={setExam}
                     onAnswer={setExamFullAnswer}
@@ -2536,6 +2645,8 @@ export default function Home() {
                                   }
                                   account={Boolean(account)}
                                   phase="review"
+                                  aiConfig={aiConfig}
+                                  onOpenAiSettings={() => setSettingsOpen(true)}
                                   disabled={exam.status === "completed"}
                                   onChange={(next) =>
                                     setExamFullAnswer(question.id, next)
@@ -2755,7 +2866,7 @@ export default function Home() {
             <div className="settings-head">
               <div>
                 <span>ACCOUNT & DISPLAY</span>
-                <h2 id="settings-title">账户与显示设置</h2>
+                <h2 id="settings-title">个人设置</h2>
               </div>
               <button
                 onClick={() => setSettingsOpen(false)}
@@ -2765,7 +2876,7 @@ export default function Home() {
               </button>
             </div>
             <p id="settings-help" className="dialog-help">
-              管理站内身份、考试日期和每日学习目标。
+              集中管理账户、学习偏好和AI辅助配置。
             </p>
             {account ? (
               <>
@@ -2869,6 +2980,122 @@ export default function Home() {
                 </a>
               </div>
             )}
+            <section className="settings-ai-section" aria-labelledby="ai-settings-title">
+              <div className="settings-section-head">
+                <div>
+                  <span>PERSONAL AI</span>
+                  <h3 id="ai-settings-title">AI辅助设置</h3>
+                </div>
+                <em className={aiConfig ? "ready" : aiVaultHint ? "saved" : ""}>
+                  {aiConfig
+                    ? "本次会话已解锁"
+                    : aiVaultHint
+                      ? "已加密保存"
+                      : "尚未配置"}
+                </em>
+              </div>
+              <p>
+                在这里设置一次，平台、模型和加密Token会长期保存在这台设备；所有题目共用同一配置。
+                出于安全考虑，重新打开浏览器后只需解锁一次。
+              </p>
+              <div className="settings-form ai-settings-form">
+                <div className="settings-row">
+                  <label>
+                    AI平台
+                    <select
+                      value={aiProvider}
+                      onChange={(event) => {
+                        const provider = event.target
+                          .value as AiVaultConfig["provider"];
+                        setAiProvider(provider);
+                        setAiModel(defaultAiModel(provider));
+                      }}
+                    >
+                      <option value="qwen">千问视觉</option>
+                      <option value="openai">OpenAI</option>
+                      <option value="deepseek">DeepSeek文字复核</option>
+                    </select>
+                  </label>
+                  <label>
+                    模型
+                    <input
+                      value={aiModel}
+                      onChange={(event) => setAiModel(event.target.value)}
+                    />
+                  </label>
+                </div>
+                <label>
+                  API Token
+                  <input
+                    type="password"
+                    value={aiApiKey}
+                    onChange={(event) => setAiApiKey(event.target.value)}
+                    placeholder={
+                      aiVaultHint
+                        ? "已安全保存；更换Token时再输入"
+                        : "输入所选平台的API Token"
+                    }
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label>
+                  本机加密与解锁口令
+                  <input
+                    type="password"
+                    value={aiPassphrase}
+                    onChange={(event) => setAiPassphrase(event.target.value)}
+                    placeholder="至少8个字符，请自行牢记"
+                    autoComplete="current-password"
+                  />
+                  <small>
+                    Token只以PBKDF2 + AES-GCM密文保存在本机，不进入账户、试卷或服务器数据库。
+                  </small>
+                </label>
+              </div>
+              {!account && (
+                <p className="ai-login-note">登录后才能发起AI识别；配置仍只保存在当前设备。</p>
+              )}
+              {aiSettingsMessage && (
+                <p className="ai-settings-message" role="status">
+                  {aiSettingsMessage}
+                </p>
+              )}
+              <div className="ai-settings-actions">
+                {aiVaultHint && !aiConfig && (
+                  <button
+                    className="secondary-button"
+                    onClick={unlockPersonalAiSettings}
+                    disabled={aiSettingsBusy || aiPassphrase.length < 8}
+                  >
+                    {aiSettingsBusy ? "处理中…" : "解锁已有配置"}
+                  </button>
+                )}
+                <button
+                  className="primary-button"
+                  onClick={savePersonalAiSettings}
+                  disabled={
+                    aiSettingsBusy ||
+                    aiPassphrase.length < 8 ||
+                    (!aiApiKey.trim() && !aiConfig)
+                  }
+                >
+                  {aiSettingsBusy
+                    ? "保存中…"
+                    : aiVaultHint
+                      ? "更新并加密保存"
+                      : "加密保存并启用"}
+                </button>
+                {aiVaultHint && (
+                  <button
+                    className="text-danger-button"
+                    onClick={clearPersonalAiSettings}
+                    disabled={aiSettingsBusy}
+                  >
+                    清除本机AI配置
+                  </button>
+                )}
+              </div>
+            </section>
           </section>
         </div>
       )}

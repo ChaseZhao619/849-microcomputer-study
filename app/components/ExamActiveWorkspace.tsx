@@ -1,6 +1,7 @@
 "use client";
 
 import type { Question } from "../question-bank";
+import type { AiVaultConfig } from "../ai-vault";
 import {
   emptyExamAnswer,
   hasExamAnswer,
@@ -13,6 +14,8 @@ type Props = {
   exam: ExamDraft;
   bank: Question[];
   account: boolean;
+  aiConfig: AiVaultConfig | null;
+  onOpenAiSettings: () => void;
   formatClock: (seconds: number) => string;
   onChange: (next: ExamDraft) => void;
   onAnswer: (questionId: number, next: ExamAnswer) => void;
@@ -63,12 +66,16 @@ function ExamQuestion({
   question,
   number,
   account,
+  aiConfig,
+  onOpenAiSettings,
   onAnswer,
 }: {
   exam: ExamDraft;
   question: Question;
   number: number;
   account: boolean;
+  aiConfig: AiVaultConfig | null;
+  onOpenAiSettings: () => void;
   onAnswer: (next: ExamAnswer) => void;
 }) {
   const answer = exam.answers[question.id] ?? emptyExamAnswer();
@@ -91,6 +98,8 @@ function ExamQuestion({
           answer={answer}
           account={account}
           phase="active"
+          aiConfig={aiConfig}
+          onOpenAiSettings={onOpenAiSettings}
           onChange={onAnswer}
         />
       ) : (
@@ -108,6 +117,8 @@ export function ExamActiveWorkspace({
   exam,
   bank,
   account,
+  aiConfig,
+  onOpenAiSettings,
   formatClock,
   onChange,
   onAnswer,
@@ -219,6 +230,8 @@ export function ExamActiveWorkspace({
                             question={question}
                             number={slot.order + 1}
                             account={account}
+                            aiConfig={aiConfig}
+                            onOpenAiSettings={onOpenAiSettings}
                             onAnswer={(next) => {
                               onChange({ ...exam, currentIndex: slot.order });
                               onAnswer(question.id, next);
@@ -260,6 +273,8 @@ export function ExamActiveWorkspace({
               answer={exam.answers[currentQuestion.id] ?? emptyExamAnswer()}
               account={account}
               phase="active"
+              aiConfig={aiConfig}
+              onOpenAiSettings={onOpenAiSettings}
               onChange={(next) => onAnswer(currentQuestion.id, next)}
             />
           ) : (

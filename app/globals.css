@@ -1945,6 +1945,7 @@ footer {
   font-weight: 700;
 }
 .settings-form input,
+.settings-form select,
 .settings-form textarea,
 .settings-row input {
   width: 100%;
@@ -1955,6 +1956,77 @@ footer {
   padding: 12px 13px;
   font-size: calc(11px + var(--font-step));
   font-weight: 400;
+}
+.settings-ai-section {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+.settings-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+.settings-section-head span {
+  color: var(--cyan);
+  font-size: calc(7px + var(--font-step));
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+.settings-section-head h3 {
+  margin: 4px 0 0;
+  font-size: calc(15px + var(--font-step));
+}
+.settings-section-head em {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border-radius: 20px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: calc(7px + var(--font-step));
+  font-style: normal;
+}
+.settings-section-head em.saved {
+  color: #b45309;
+  background: #fff7ed;
+}
+.settings-section-head em.ready {
+  color: #17685f;
+  background: var(--cyan-soft);
+}
+.settings-ai-section > p {
+  color: var(--muted);
+  font-size: calc(9px + var(--font-step));
+  line-height: 1.7;
+}
+.ai-settings-form {
+  margin-top: 14px;
+}
+.ai-login-note,
+.ai-settings-message {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: #fff7ed;
+  color: #9a4c08 !important;
+}
+.ai-settings-message {
+  background: var(--panel-2);
+  color: var(--ink) !important;
+}
+.ai-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 14px;
+}
+.text-danger-button {
+  border: 1px solid #efb5ad;
+  background: transparent;
+  color: var(--red);
+  border-radius: 7px;
+  padding: 9px 12px;
 }
 .settings-form textarea {
   resize: vertical;
@@ -2074,6 +2146,16 @@ footer {
     padding: 10px;
   }
   .settings-actions .primary-button {
+    width: 100%;
+  }
+  .settings-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .settings-section-head em {
+    width: max-content;
+  }
+  .ai-settings-actions > button {
     width: 100%;
   }
 }

@@ -8,13 +8,7 @@ import {
 } from "react";
 import Image from "next/image";
 import type { Question } from "../question-bank";
-import {
-  clearAiVault,
-  readAiVaultHint,
-  saveAiVault,
-  unlockAiVault,
-  type AiVaultConfig,
-} from "../ai-vault";
+import type { AiVaultConfig } from "../ai-vault";
 import {
   emptyExamAnswer,
   type ExamAnswer,
@@ -36,6 +30,8 @@ type Props = {
   answer?: ExamAnswer;
   account: boolean;
   phase: "active" | "review";
+  aiConfig: AiVaultConfig | null;
+  onOpenAiSettings: () => void;
   disabled?: boolean;
   onChange: (answer: ExamAnswer) => void;
 };
@@ -153,6 +149,8 @@ export function SubjectiveAnswerTools({
   answer = emptyExamAnswer(),
   account,
   phase,
+  aiConfig,
+  onOpenAiSettings,
   disabled,
   onChange,
 }: Props) {
@@ -170,15 +168,6 @@ export function SubjectiveAnswerTools({
   const answerRef = useRef(answer);
   const hydratedAssets = useRef(new Set<string>());
   const [aiOpen, setAiOpen] = useState(false);
-  const [vaultHint, setVaultHint] = useState<{
-    provider: AiVaultConfig["provider"];
-    model: string;
-  } | null>(null);
-  const [provider, setProvider] = useState<AiVaultConfig["provider"]>("qwen");
-  const [model, setModel] = useState("qwen3-vl-plus");
-  const [apiKey, setApiKey] = useState("");
-  const [passphrase, setPassphrase] = useState("");
-  const [unlocked, setUnlocked] = useState<AiVaultConfig | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [initialPageId] = useState(() => crypto.randomUUID());
   const pages = answer.handwriting.length
@@ -243,17 +232,6 @@ export function SubjectiveAnswerTools({
     },
     [],
   );
-  useEffect(() => {
-    readAiVaultHint()
-      .then((hint) => {
-        setVaultHint(hint);
-        if (hint) {
-          setProvider(hint.provider);
-          setModel(hint.model);
-        }
-      })
-      .catch(() => {});
-  }, []);
   function update(patch: Partial<ExamAnswer>) {
     onChange({ ...answer, ...patch });
   }
@@ -479,35 +457,13 @@ export function SubjectiveAnswerTools({
       ],
     });
   }
-  async function saveVault() {
-    try {
-      await saveAiVault({ provider, model, apiKey }, passphrase);
-      setUnlocked({ provider, model, apiKey });
-      setApiKey("");
-      setVaultHint({ provider, model });
-      setMessage("AI配置已加密保存在本机");
-    } catch (error) {
-      setMessage((error as Error).message);
-    }
-  }
-  async function unlockVault() {
-    try {
-      const config = await unlockAiVault(passphrase);
-      setUnlocked(config);
-      setProvider(config.provider);
-      setModel(config.model);
-      setMessage("AI密钥库已解锁");
-    } catch (error) {
-      setMessage((error as Error).message);
-    }
-  }
   async function runAi() {
     if (!account) {
       setMessage("请先登录后使用AI识别");
       return;
     }
-    if (!unlocked) {
-      setMessage("请先解锁或保存AI配置");
+    if (!aiConfig) {
+      setMessage("请先在个人设置中配置或解锁AI辅助");
       return;
     }
     setAiBusy(true);
@@ -528,13 +484,13 @@ export function SubjectiveAnswerTools({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          provider: unlocked.provider,
-          model: unlocked.model,
-          token: unlocked.apiKey,
+          provider: aiConfig.provider,
+          model: aiConfig.model,
+          token: aiConfig.apiKey,
           examId,
           questionId: question.id,
           phase,
-          images: unlocked.provider === "deepseek" ? [] : images,
+          images: aiConfig.provider === "deepseek" ? [] : images,
           transcript: answer.text,
         }),
       });
@@ -764,82 +720,17 @@ export function SubjectiveAnswerTools({
         <section className="ai-panel">
           <div className="ai-head">
             <div>
-              <strong>用户自备AI</strong>
-              <small>Token不会进入账户、试卷或服务器数据库</small>
+              <strong>AI辅助识别</strong>
+              <small>平台与 Token 已集中到个人设置管理</small>
             </div>
-            <span>
-              {unlocked
-                ? "本次会话已解锁"
-                : vaultHint
-                  ? "设备中已有加密配置"
-                  : "尚未配置"}
-            </span>
-          </div>
-          <div className="ai-config">
-            <label>
-              平台
-              <select
-                value={provider}
-                onChange={(event) => {
-                  const value = event.target.value as AiVaultConfig["provider"];
-                  setProvider(value);
-                  setModel(
-                    value === "qwen"
-                      ? "qwen3-vl-plus"
-                      : value === "openai"
-                        ? "gpt-5.4"
-                        : "deepseek-v4-flash",
-                  );
-                }}
-              >
-                <option value="qwen">千问视觉</option>
-                <option value="openai">OpenAI</option>
-                <option value="deepseek">DeepSeek文字复核</option>
-              </select>
-            </label>
-            <label>
-              模型
-              <input
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-              />
-            </label>
-            {!vaultHint && (
-              <label>
-                API Token
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                  autoComplete="off"
-                />
-              </label>
-            )}
-            <label>
-              本机解锁口令
-              <input
-                type="password"
-                value={passphrase}
-                onChange={(event) => setPassphrase(event.target.value)}
-                autoComplete="off"
-              />
-            </label>
+            <span>{aiConfig ? `${aiConfig.provider} · 已就绪` : "未解锁"}</span>
           </div>
           <div className="ai-actions">
-            {vaultHint ? (
-              <button onClick={unlockVault}>解锁密钥库</button>
-            ) : (
-              <button
-                onClick={saveVault}
-                disabled={!apiKey || passphrase.length < 8}
-              >
-                加密保存并解锁
-              </button>
-            )}
+            {!aiConfig && <button onClick={onOpenAiSettings}>前往个人设置</button>}
             <button
               className="primary-button"
               onClick={runAi}
-              disabled={!unlocked || aiBusy}
+              disabled={!aiConfig || aiBusy}
             >
               {aiBusy
                 ? "识别中…"
@@ -847,19 +738,7 @@ export function SubjectiveAnswerTools({
                   ? "仅转写笔迹"
                   : "识别并建议评分点"}
             </button>
-            {vaultHint && (
-              <button
-                onClick={() =>
-                  clearAiVault().then(() => {
-                    setVaultHint(null);
-                    setUnlocked(null);
-                    setMessage("已清除本机AI配置");
-                  })
-                }
-              >
-                清除配置
-              </button>
-            )}
+            {aiConfig && <button onClick={onOpenAiSettings}>管理AI设置</button>}
           </div>
           {answer.analysis && (
             <div className="ai-result">
