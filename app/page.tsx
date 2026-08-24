@@ -163,6 +163,13 @@ const navItems = [
 ] as const;
 
 type View = (typeof navItems)[number]["id"];
+const learningViews = new Set<View>([
+  "practice",
+  "analytics",
+  "plan",
+  "exam",
+  "mistakes",
+]);
 type FontSize = "small" | "standard" | "large" | "xlarge";
 type ProgressStatus = "mastered" | "unsure" | "mistake";
 type StoredProgress = Record<number, ProgressStatus>;
@@ -323,6 +330,8 @@ export default function Home() {
   const [localEvents, setLocalEvents] = useState<AnalyticsEvent[]>([]);
   const [examHistory, setExamHistory] = useState<ExamLike[]>([]);
   const [account, setAccount] = useState<AccountSummary | null>(null);
+  const [loginGateOpen, setLoginGateOpen] = useState(false);
+  const [loginGateReason, setLoginGateReason] = useState("开始学习");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsNickname, setSettingsNickname] = useState("");
   const [settingsStudyId, setSettingsStudyId] = useState("");
@@ -363,9 +372,20 @@ export default function Home() {
 
   const closeSearch = useCallback(() => setSearchOpen(false), []);
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const closeLoginGate = useCallback(() => setLoginGateOpen(false), []);
   const searchDialogRef = useFocusTrap(searchOpen, closeSearch, searchInputRef);
   const settingsDialogRef = useFocusTrap(settingsOpen, closeSettings);
-  const modalOpen = searchOpen || settingsOpen;
+  const loginGateDialogRef = useFocusTrap(loginGateOpen, closeLoginGate);
+  const modalOpen = searchOpen || settingsOpen || loginGateOpen;
+
+  const openSearch = useCallback(() => {
+    if (account) {
+      setSearchOpen(true);
+      return;
+    }
+    setLoginGateReason("搜索并进入题目");
+    setLoginGateOpen(true);
+  }, [account]);
 
   useEffect(() => {
     readAiVaultHint()
@@ -570,12 +590,12 @@ export default function Home() {
     const handler = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setSearchOpen(true);
+        openSearch();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [openSearch]);
   useEffect(() => {
     if (settingsError) queueMicrotask(() => settingsErrorRef.current?.focus());
   }, [settingsError]);
@@ -740,7 +760,21 @@ export default function Home() {
     }));
   }, [activity]);
 
+  function requireLearningAccount(reason: string) {
+    if (account) return true;
+    setLoginGateReason(reason);
+    setLoginGateOpen(true);
+    return false;
+  }
+
   function switchView(next: View) {
+    if (
+      learningViews.has(next) &&
+      !requireLearningAccount(
+        navItems.find((item) => item.id === next)?.label ?? "开始学习",
+      )
+    )
+      return;
     setView(next);
     setSidebarOpen(false);
     if (next === "mistakes") {
@@ -766,6 +800,7 @@ export default function Home() {
   }
 
   function beginChapter(chapter: string) {
+    if (!requireLearningAccount(`练习“${chapter}”章节`)) return;
     setActivePlanKey(null);
     setSearchFilter("");
     setSelectedChapter(chapter);
@@ -775,6 +810,7 @@ export default function Home() {
   }
 
   function beginPlan(item: PlanItem) {
+    if (!requireLearningAccount("继续学习计划")) return;
     setActivePlanKey(String(item.id ?? item.localKey));
     setSearchFilter("");
     setSelectedChapter(item.chapter);
@@ -784,6 +820,7 @@ export default function Home() {
   }
 
   function chooseSearchResult(question: Question) {
+    if (!requireLearningAccount("进入搜索题目")) return;
     setSearchFilter(searchQuery.trim());
     setSelectedChapter("全部章节");
     setDifficulty("全部难度");
@@ -828,6 +865,7 @@ export default function Home() {
     source: "practice" | "review" | "exam",
     eventId = crypto.randomUUID(),
   ) {
+    if (!requireLearningAccount("提交答案")) return;
     const old = reviews[question.id] ?? {
       stage: 0,
       nextReviewAt: null,
@@ -990,6 +1028,7 @@ export default function Home() {
   }
 
   async function savePlan() {
+    if (!requireLearningAccount("创建学习计划")) return;
     const planDate = shanghaiDate();
     const chapterCount = questions.filter(
       (question) => question.chapter === planChapter,
@@ -1036,6 +1075,7 @@ export default function Home() {
   }
 
   function newExam() {
+    if (!requireLearningAccount("创建练习卷")) return;
     const pool = questions.filter(
       (question) =>
         examChapter === "全部章节" || question.chapter === examChapter,
@@ -1141,6 +1181,7 @@ export default function Home() {
   }
 
   function resumeExam() {
+    if (!requireLearningAccount("继续未完成考试")) return;
     if (!exam) return;
     setExam({
       ...exam,
@@ -1357,7 +1398,9 @@ export default function Home() {
       setAiProvider(config.provider);
       setAiModel(config.model);
       setAiPassphrase("");
-      setAiSettingsMessage("AI辅助已解锁，本次浏览器会话内所有题目均可直接使用");
+      setAiSettingsMessage(
+        "AI辅助已解锁，本次浏览器会话内所有题目均可直接使用",
+      );
     } catch (error) {
       setAiSettingsMessage(
         error instanceof Error ? error.message : "AI配置解锁失败",
@@ -1577,10 +1620,7 @@ export default function Home() {
               </strong>
             </div>
             <div className="top-actions">
-              <button
-                className="search-button"
-                onClick={() => setSearchOpen(true)}
-              >
+              <button className="search-button" onClick={openSearch}>
                 ⌕ <span>搜索题目</span>
                 <kbd>⌘ K</kbd>
               </button>
@@ -1637,7 +1677,7 @@ export default function Home() {
                   className="signin-button"
                   href="/signin-with-chatgpt?return_to=%2F"
                 >
-                  登录同步
+                  登录学习
                 </a>
               )}
             </div>
@@ -1646,6 +1686,24 @@ export default function Home() {
           <main>
             {view === "home" && (
               <>
+                {!account && (
+                  <section
+                    className="guest-mode-banner"
+                    aria-label="访客浏览模式"
+                  >
+                    <div>
+                      <span aria-hidden="true">◎</span>
+                      <p>
+                        <strong>当前为访客浏览模式</strong>
+                        你可以查看网站介绍和题库目录；登录 ChatGPT
+                        后即可刷题、组卷、复测并同步学习记录。
+                      </p>
+                    </div>
+                    <a href="/signin-with-chatgpt?return_to=%2F">
+                      登录 ChatGPT 开始学习 →
+                    </a>
+                  </section>
+                )}
                 <section className="hero-panel">
                   <div className="hero-copy">
                     <span className="eyebrow">
@@ -1664,7 +1722,7 @@ export default function Home() {
                         className="primary-button"
                         onClick={() => beginChapter("8086 CPU结构")}
                       >
-                        开始章节训练 →
+                        {account ? "开始章节训练 →" : "登录后开始刷题 →"}
                       </button>
                       <button
                         className="secondary-button"
@@ -1875,7 +1933,7 @@ export default function Home() {
               </>
             )}
 
-            {(view === "practice" || view === "mistakes") && (
+            {account && (view === "practice" || view === "mistakes") && (
               <section className="practice-view">
                 <div className="practice-header">
                   <div>
@@ -2151,7 +2209,7 @@ export default function Home() {
               </section>
             )}
 
-            {view === "analytics" && (
+            {account && view === "analytics" && (
               <AnalyticsView
                 account={Boolean(account)}
                 localEvents={localEvents}
@@ -2170,7 +2228,7 @@ export default function Home() {
               />
             )}
 
-            {view === "plan" && (
+            {account && view === "plan" && (
               <section className="workspace-view">
                 <div className="practice-header">
                   <div>
@@ -2306,7 +2364,7 @@ export default function Home() {
               </section>
             )}
 
-            {view === "exam" && (
+            {account && view === "exam" && (
               <section className="workspace-view">
                 <div className="practice-header">
                   <div>
@@ -2734,6 +2792,29 @@ export default function Home() {
                 )}
               </section>
             )}
+
+            {!account && learningViews.has(view) && (
+              <section
+                className="login-required-view"
+                aria-labelledby="login-required-title"
+              >
+                <span aria-hidden="true">◎</span>
+                <h1 id="login-required-title">登录后继续学习</h1>
+                <p>
+                  访客可以浏览首页和题库目录；刷题、学习计划、数据、考试与错题复测需要登录
+                  ChatGPT。
+                </p>
+                <a
+                  className="primary-button"
+                  href="/signin-with-chatgpt?return_to=%2F"
+                >
+                  登录 ChatGPT
+                </a>
+                <button onClick={() => switchView("mastery")}>
+                  先浏览题库目录
+                </button>
+              </section>
+            )}
           </main>
           <footer>
             <span>849微机研习社 · 200题逐题编辑复核</span>
@@ -2752,6 +2833,59 @@ export default function Home() {
       {notice && (
         <div className="toast" role="status">
           {notice}
+        </div>
+      )}
+
+      {loginGateOpen && (
+        <div
+          className="settings-overlay"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) closeLoginGate();
+          }}
+        >
+          <section
+            ref={loginGateDialogRef}
+            className="settings-dialog access-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="login-gate-title"
+            aria-describedby="login-gate-help"
+            tabIndex={-1}
+          >
+            <div className="settings-head">
+              <div>
+                <span>MEMBER LEARNING</span>
+                <h2 id="login-gate-title">登录后即可学习</h2>
+              </div>
+              <button onClick={closeLoginGate} aria-label="关闭登录提示">
+                ×
+              </button>
+            </div>
+            <div className="access-dialog-body">
+              <span className="access-lock" aria-hidden="true">
+                ◎
+              </span>
+              <p id="login-gate-help">
+                你正在尝试<strong>{loginGateReason}</strong>。本站允许所有
+                ChatGPT
+                用户登录使用；访客可以浏览首页和题库目录，但不能打开题目或提交作答。
+              </p>
+              <ul>
+                <li>登录后可使用完整 200 题题库与关键词搜索</li>
+                <li>学习进度、计划、考试和复测记录可随账户同步</li>
+                <li>不新增匿名学习追踪，旧本机记录也不会被删除</li>
+              </ul>
+            </div>
+            <div className="settings-actions access-actions">
+              <button onClick={closeLoginGate}>继续浏览</button>
+              <a
+                className="primary-button"
+                href="/signin-with-chatgpt?return_to=%2F"
+              >
+                登录 ChatGPT 开始学习
+              </a>
+            </div>
+          </section>
         </div>
       )}
 
@@ -2971,16 +3105,21 @@ export default function Home() {
               <div className="settings-guest">
                 <span>◎</span>
                 <h3>登录后管理账户</h3>
-                <p>登录ChatGPT后可同步计划、真实历史和未完成试卷。</p>
+                <p>
+                  访客仅可浏览；登录ChatGPT后可刷题并同步计划、真实历史和未完成试卷。
+                </p>
                 <a
                   className="primary-button"
                   href="/signin-with-chatgpt?return_to=%2F"
                 >
-                  登录并同步
+                  登录并开始学习
                 </a>
               </div>
             )}
-            <section className="settings-ai-section" aria-labelledby="ai-settings-title">
+            <section
+              className="settings-ai-section"
+              aria-labelledby="ai-settings-title"
+            >
               <div className="settings-section-head">
                 <div>
                   <span>PERSONAL AI</span>
@@ -3048,12 +3187,15 @@ export default function Home() {
                     autoComplete="current-password"
                   />
                   <small>
-                    Token只以PBKDF2 + AES-GCM密文保存在本机，不进入账户、试卷或服务器数据库。
+                    Token只以PBKDF2 +
+                    AES-GCM密文保存在本机，不进入账户、试卷或服务器数据库。
                   </small>
                 </label>
               </div>
               {!account && (
-                <p className="ai-login-note">登录后才能发起AI识别；配置仍只保存在当前设备。</p>
+                <p className="ai-login-note">
+                  登录后才能发起AI识别；配置仍只保存在当前设备。
+                </p>
               )}
               {aiSettingsMessage && (
                 <p className="ai-settings-message" role="status">

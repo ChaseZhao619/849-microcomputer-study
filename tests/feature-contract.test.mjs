@@ -54,6 +54,30 @@ test("搜索与对话框键盘契约存在", () => {
     assert.ok(page.includes(token), token);
 });
 
+test("访客只能浏览且所有ChatGPT登录用户可进入学习功能", () => {
+  for (const token of [
+    "learningViews",
+    "requireLearningAccount",
+    "loginGateOpen",
+    "当前为访客浏览模式",
+    "访客可以浏览首页和题库目录",
+    "/signin-with-chatgpt?return_to=%2F",
+    "登录 ChatGPT 开始学习",
+  ])
+    assert.ok(page.includes(token), token);
+  for (const entry of [
+    '"practice"',
+    '"analytics"',
+    '"plan"',
+    '"exam"',
+    '"mistakes"',
+  ])
+    assert.ok(page.includes(entry), entry);
+  assert.ok(page.includes('account && (view === "practice"'));
+  assert.ok(page.includes('account && view === "analytics"'));
+  assert.ok(page.includes('account && view === "exam"'));
+});
+
 test("整卷、私有附件和BYOK安全契约存在", () => {
   for (const token of [
     "paperLayout",
