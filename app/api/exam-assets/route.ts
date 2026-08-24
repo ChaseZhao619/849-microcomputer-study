@@ -1,6 +1,6 @@
 import { and, eq, lt } from "drizzle-orm";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { getDb } from "../../../db";
+import { accountAccess, suspendedAccountResponse } from "../../account-access";
 import { getAnswerAssets } from "../../../db/storage";
 import { examAnswerAssets, examSessions } from "../../../db/schema";
 
@@ -15,7 +15,13 @@ const allowedTypes = new Set([
 async function userContext() {
   const user = await getChatGPTUser();
   if (!user) return null;
-  return { user, db: getDb(), bucket: getAnswerAssets() };
+  const access = await accountAccess(user.id);
+  return {
+    user,
+    db: access.db,
+    bucket: getAnswerAssets(),
+    suspended: access.suspended,
+  };
 }
 
 async function purgeExpired(
@@ -69,6 +75,7 @@ export async function GET(request: Request) {
   try {
     const context = await userContext();
     if (!context) return Response.json({ error: "请先登录" }, { status: 401 });
+    if (context.suspended) return suspendedAccountResponse();
     await purgeExpired(context);
     const id = new URL(request.url).searchParams.get("id");
     const examId = new URL(request.url).searchParams.get("examId");
@@ -135,6 +142,7 @@ export async function POST(request: Request) {
   const context = await userContext();
   if (!context)
     return Response.json({ error: "请先登录后上传" }, { status: 401 });
+  if (context.suspended) return suspendedAccountResponse();
   try {
     await purgeExpired(context);
     const form = await request.formData();
@@ -235,6 +243,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const context = await userContext();
   if (!context) return Response.json({ error: "请先登录" }, { status: 401 });
+  if (context.suspended) return suspendedAccountResponse();
   try {
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return Response.json({ error: "附件编号为空" }, { status: 400 });

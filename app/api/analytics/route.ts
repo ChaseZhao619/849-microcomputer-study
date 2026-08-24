@@ -1,6 +1,6 @@
 import { and, desc, eq, gte } from "drizzle-orm";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { getDb } from "../../../db";
+import { accountAccess, suspendedAccountResponse } from "../../account-access";
 import {
   answerEvents,
   examAttempts,
@@ -22,13 +22,15 @@ export async function GET(request: Request) {
   try {
     const user = await getChatGPTUser();
     if (!user) return Response.json({ authenticated: false }, { status: 401 });
+    const access = await accountAccess(user.id);
+    if (access.suspended) return suspendedAccountResponse();
     const url = new URL(request.url);
     const days = [7, 30, 70].includes(Number(url.searchParams.get("days")))
       ? Number(url.searchParams.get("days"))
       : 70;
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - days + 1);
-    const db = getDb();
+    const db = access.db;
     const [events, progress, exams] = await Promise.all([
       db
         .select()

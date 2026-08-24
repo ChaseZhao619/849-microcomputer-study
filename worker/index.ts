@@ -10,6 +10,8 @@ interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
   ANSWER_ASSETS: R2Bucket;
+  ADMIN_BRIDGE_SECRET?: string;
+  ADMIN_EMAIL?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {

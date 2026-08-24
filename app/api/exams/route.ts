@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { getDb } from "../../../db";
+import { accountAccess, suspendedAccountResponse } from "../../account-access";
 import {
   aiAnalysisEvents,
   examAnswerAssets,
@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
 async function context() {
   const user = await getChatGPTUser();
   if (!user) return null;
-  return { user, db: getDb() };
+  const access = await accountAccess(user.id);
+  return { user, db: access.db, suspended: access.suspended };
 }
 
 export async function GET() {
@@ -21,6 +22,7 @@ export async function GET() {
     const current = await context();
     if (!current)
       return Response.json({ authenticated: false }, { status: 401 });
+    if (current.suspended) return suspendedAccountResponse();
     const sessions = await current.db
       .select()
       .from(examSessions)
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
     const current = await context();
     if (!current)
       return Response.json({ error: "请先登录后同步试卷" }, { status: 401 });
+    if (current.suspended) return suspendedAccountResponse();
     const body = (await request.json()) as Record<string, unknown>;
     const action = String(body.action || "save");
     if (
@@ -137,6 +140,7 @@ export async function DELETE(request: Request) {
   try {
     const current = await context();
     if (!current) return Response.json({ error: "请先登录" }, { status: 401 });
+    if (current.suspended) return suspendedAccountResponse();
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return Response.json({ error: "缺少试卷编号" }, { status: 400 });
     const [session] = await current.db

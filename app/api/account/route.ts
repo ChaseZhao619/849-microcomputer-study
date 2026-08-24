@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { getDb } from "../../../db";
+import { accountAccess, suspendedAccountResponse } from "../../account-access";
+import { recordAnswerRollup, recordExamRollup } from "../../../db/admin-rollups";
 import {
   answerEvents,
   aiAnalysisEvents,
@@ -12,6 +13,7 @@ import {
   userProfiles,
 } from "../../../db/schema";
 import { getAnswerAssets } from "../../../db/storage";
+import { questions } from "../../question-bank";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +29,9 @@ function shanghaiDate(value = new Date()) {
 async function requireApiUser() {
   const user = await getChatGPTUser();
   if (!user) return null;
-  const db = getDb();
+  const access = await accountAccess(user.id);
+  if (access.suspended) return { user, db: access.db, suspended: true };
+  const db = access.db;
   await db
     .insert(userProfiles)
     .values({
@@ -78,7 +82,7 @@ async function requireApiUser() {
   } catch {
     // Expiry cleanup is opportunistic and must never block account activity.
   }
-  return { user, db };
+  return { user, db, suspended: false };
 }
 
 export async function GET() {
@@ -86,6 +90,7 @@ export async function GET() {
     const context = await requireApiUser();
     if (!context)
       return Response.json({ authenticated: false }, { status: 401 });
+    if (context.suspended) return suspendedAccountResponse();
     const { user, db } = context;
     const start = new Date();
     start.setUTCDate(start.getUTCDate() - 69);
@@ -155,6 +160,7 @@ export async function POST(request: Request) {
     const context = await requireApiUser();
     if (!context)
       return Response.json({ error: "请先登录 ChatGPT 账户" }, { status: 401 });
+    if (context.suspended) return suspendedAccountResponse();
     const { user, db } = context;
     const body = (await request.json()) as Record<string, unknown>;
 
@@ -239,7 +245,7 @@ export async function POST(request: Request) {
         )
         .limit(1);
 
-      await db
+      const insertedEvents = await db
         .insert(answerEvents)
         .values({
           id: eventId,
@@ -258,7 +264,27 @@ export async function POST(request: Request) {
               ? null
               : Math.max(0, Math.round(Number(body.possiblePoints) || 0)),
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ id: answerEvents.id });
+
+      if (insertedEvents.length) {
+        const question = questions.find((item) => item.id === questionId);
+        await recordAnswerRollup({
+          userId: user.id,
+          answeredAt: safeAnsweredAt.toISOString(),
+          activityDate: shanghaiDate(safeAnsweredAt),
+          objective: question?.scoring !== "rubric",
+          correct,
+          earnedPoints:
+            body.earnedPoints == null
+              ? null
+              : Math.max(0, Math.round(Number(body.earnedPoints) || 0)),
+          possiblePoints:
+            body.possiblePoints == null
+              ? null
+              : Math.max(0, Math.round(Number(body.possiblePoints) || 0)),
+        });
+      }
 
       await db
         .insert(questionProgress)
@@ -398,7 +424,7 @@ export async function POST(request: Request) {
 
     if (body.action === "exam") {
       const id = String(body.id || crypto.randomUUID());
-      await db
+      const insertedExams = await db
         .insert(examAttempts)
         .values({
           id,
@@ -410,7 +436,13 @@ export async function POST(request: Request) {
           total: Math.max(1, Number(body.total) || 1),
           durationSeconds: Math.max(0, Number(body.durationSeconds) || 0),
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning({ id: examAttempts.id });
+      if (insertedExams.length)
+        await recordExamRollup({
+          userId: user.id,
+          completedAt: new Date().toISOString(),
+        });
       return Response.json({ ok: true, id });
     }
 

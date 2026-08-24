@@ -1,6 +1,6 @@
 import { and, count, eq, gte, lt } from "drizzle-orm";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { getDb } from "../../../db";
+import { accountAccess, suspendedAccountResponse } from "../../account-access";
 import {
   aiAnalysisEvents,
   aiRequestLocks,
@@ -64,6 +64,8 @@ export async function POST(request: Request) {
     const user = await getChatGPTUser();
     if (!user)
       return Response.json({ error: "请先登录后使用AI识别" }, { status: 401 });
+    const access = await accountAccess(user.id);
+    if (access.suspended) return suspendedAccountResponse();
     const body = (await request.json()) as Record<string, unknown>;
     const provider = String(body.provider || "") as Provider;
     if (!(provider in endpoints))
@@ -102,7 +104,7 @@ export async function POST(request: Request) {
         { error: "没有可识别的笔迹或文字" },
         { status: 400 },
       );
-    const db = getDb();
+    const db = access.db;
     const [session] = await db
       .select({
         id: examSessions.id,

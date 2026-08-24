@@ -26,7 +26,11 @@ export const userProfiles = sqliteTable(
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),
   },
-  (table) => [uniqueIndex("idx_user_profiles_study_id").on(table.studyId)],
+  (table) => [
+    uniqueIndex("idx_user_profiles_study_id").on(table.studyId),
+    index("idx_user_profiles_created_at").on(table.createdAt),
+    index("idx_user_profiles_updated_at").on(table.updatedAt),
+  ],
 );
 
 export const questionProgress = sqliteTable(
@@ -66,6 +70,7 @@ export const studyPlans = sqliteTable(
       table.planDate,
       table.chapter,
     ),
+    index("idx_study_plans_date_status").on(table.planDate, table.status),
   ],
 );
 
@@ -89,6 +94,7 @@ export const examAttempts = sqliteTable(
       table.userId,
       table.completedAt,
     ),
+    index("idx_exam_attempts_completed_at").on(table.completedAt),
   ],
 );
 
@@ -107,6 +113,14 @@ export const answerEvents = sqliteTable(
   },
   (table) => [
     index("idx_answer_events_user_date").on(table.userId, table.activityDate),
+    index("idx_answer_events_date_source").on(
+      table.activityDate,
+      table.source,
+    ),
+    index("idx_answer_events_question_date").on(
+      table.questionId,
+      table.activityDate,
+    ),
   ],
 );
 
@@ -218,3 +232,77 @@ export const aiRequestLocks = sqliteTable("ai_request_locks", {
   requestId: text("request_id").notNull(),
   createdAt: text("created_at").notNull(),
 });
+
+export const adminUserControls = sqliteTable(
+  "admin_user_controls",
+  {
+    userId: text("user_id").primaryKey(),
+    status: text("status").notNull().default("active"),
+    note: text("note").notNull().default(""),
+    tagsJson: text("tags_json").notNull().default("[]"),
+    suspensionReason: text("suspension_reason"),
+    updatedBy: text("updated_by").notNull(),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("idx_admin_user_controls_status").on(table.status)],
+);
+
+export const adminAuditEvents = sqliteTable(
+  "admin_audit_events",
+  {
+    id: text("id").primaryKey(),
+    actorEmail: text("actor_email").notNull(),
+    action: text("action").notNull(),
+    targetUserId: text("target_user_id"),
+    reason: text("reason").notNull().default(""),
+    metadataJson: text("metadata_json").notNull().default("{}"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_admin_audit_created_at").on(table.createdAt),
+    index("idx_admin_audit_target_created").on(
+      table.targetUserId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const adminRequestNonces = sqliteTable(
+  "admin_request_nonces",
+  {
+    nonce: text("nonce").primaryKey(),
+    actorEmail: text("actor_email").notNull(),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+  },
+  (table) => [index("idx_admin_request_nonces_expiry").on(table.expiresAt)],
+);
+
+export const userAdminRollups = sqliteTable(
+  "user_admin_rollups",
+  {
+    userId: text("user_id").primaryKey(),
+    lastActivityAt: text("last_activity_at"),
+    lastActivityDate: text("last_activity_date"),
+    answerCount: integer("answer_count").notNull().default(0),
+    objectiveAttempts: integer("objective_attempts").notNull().default(0),
+    objectiveCorrect: integer("objective_correct").notNull().default(0),
+    subjectiveEarned: integer("subjective_earned").notNull().default(0),
+    subjectivePossible: integer("subjective_possible").notNull().default(0),
+    examCount: integer("exam_count").notNull().default(0),
+    lastExamAt: text("last_exam_at"),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_user_admin_rollups_last_activity").on(table.lastActivityAt),
+    index("idx_user_admin_rollups_last_activity_date").on(
+      table.lastActivityDate,
+    ),
+  ],
+);
